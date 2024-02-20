@@ -550,16 +550,17 @@ float RFM95_getPcktSNR(RFM95_t* rfm95)
 {
 	uint8_t readVal;
 	rfm95_readReg(rfm95, REG_PCKT_SNR_VAL, &readVal);
-	rfm95->Settings.LoRaPcktHandler.SNR = (float)readVal / 4;
+	rfm95->Settings.LoRaPcktHandler.SNR = (float)((int8_t)readVal * 0.25);
 	return rfm95->Settings.LoRaPcktHandler.SNR;
 }
 
 int16_t RFM95_getPcktRSSI(RFM95_t* rfm95)
 {
-	float pcktSNR = RFM95_getPcktSNR(rfm95);
+
 	uint8_t pcktRSSI;
 	if(rfm95_readReg(rfm95, REG_PCKT_RSSI_VAL, &pcktRSSI))
 				return RFM95_ERR_READ_REG;
+	float pcktSNR = RFM95_getPcktSNR(rfm95);;
 	// high frequency
 	if(rfm95->Settings.LoRa.frequency <= 1020000000 &&
 			rfm95->Settings.LoRa.frequency >= 862000000)
