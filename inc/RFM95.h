@@ -108,7 +108,7 @@ typedef struct
 typedef struct
 {
     uint32_t                frequency;
-    lora_sf                 spreadingFactor;
+    uint8_t                 spreadingFactor;
     lora_bw                 bandWidth;
     lora_coding_rate        codingRate;
     uint8_t                 txPower;

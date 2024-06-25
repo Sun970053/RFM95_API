@@ -546,6 +546,8 @@ uint8_t RFM95_LoRa_receive(RFM95_t* rfm95, uint8_t* buffer, uint8_t bufferlen)
     // fail to receive signal
     else
     {
+    	// clear the RxFlags interrupt
+		irq_rxFlags = (uint8_t)(~Irq_RxDone);
         RFM95_LoRa_setOpMode(rfm95, SLEEP_MODE);
         return RFM95_ERR_RX_FAIL;
     }
