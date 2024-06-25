@@ -480,7 +480,7 @@ uint8_t RFM95_LoRa_prepareReceive(RFM95_t* rfm95, bool isRxContinous)
     uint8_t ret;
     if(isRxContinous)
     {
-    	uint8_t irq = Irq_RxDone | Irq_PayloadCrcError | Irq_ValidHeader;
+    	uint8_t irq = Irq_RxDone & Irq_PayloadCrcError & Irq_ValidHeader;
     	uint8_t fifoptr = 0;
         // set RegIrqFlagsMask: RxDoneMask, PayloadCrcErrorMask and ValidHeaderMask are activated.
         ret = rfm95_writeReg(rfm95, REG_IRQ_FLAGS_MASK, &irq);
@@ -496,10 +496,10 @@ uint8_t RFM95_LoRa_prepareReceive(RFM95_t* rfm95, bool isRxContinous)
         if(ret) return ret;
         ret = rfm95_writeReg(rfm95, REG_FIFO_RX_BASE_ADDR, &fifoptr);
         if(ret) return ret;
-        // set Rx Mode
-        ret = RFM95_LoRa_setOpMode(rfm95, RX_CONTINUOUS);
-        if(ret) return ret;
 
+        // set Rx Mode
+		ret = RFM95_LoRa_setOpMode(rfm95, RX_CONTINUOUS);
+		if(ret) return ret;
         rfm95->Settings.LoRa.isRxContinous = true;
     }
     else
@@ -512,12 +512,12 @@ uint8_t RFM95_LoRa_prepareReceive(RFM95_t* rfm95, bool isRxContinous)
 
 uint8_t RFM95_LoRa_receive(RFM95_t* rfm95, uint8_t* buffer, uint8_t bufferlen)
 {
-    uint8_t ret, readIrqFlag, rxNbBytes, rxCurrentAddr, minLen;
+    uint8_t ret, readIrqFlag, rxNbBytes, rxCurrentAddr, minLen, irq_rxFlags;
     // check current IRQ flags.
     ret = rfm95_readReg(rfm95, REG_IRQ_FLAGS, &readIrqFlag);
     if(ret) return ret;
     // RxDone
-    if((readIrqFlag & (uint8_t)(~Irq_RxDone)) != 0x00)
+    if((readIrqFlag & (uint8_t)(~Irq_RxDone | ~Irq_ValidHeader)) != 0x00)
     {
         // Set RegFifoAddrPtr to RegFifoRxCurrentAddr
         rfm95_readReg(rfm95, REG_RX_NB_BYTES, &rxNbBytes);
@@ -530,9 +530,18 @@ uint8_t RFM95_LoRa_receive(RFM95_t* rfm95, uint8_t* buffer, uint8_t bufferlen)
         // CRC Error
         if((readIrqFlag & (uint8_t)(~Irq_PayloadCrcError)) != 0x00)
         {
+        	// clear the RxFlags interrupt
+        	irq_rxFlags = (uint8_t)(~Irq_RxDone | ~Irq_PayloadCrcError | Irq_ValidHeader);
+			rfm95_writeReg(rfm95, REG_IRQ_FLAGS, &irq_rxFlags);
             return RFM95_ERR_RX_PAYLOAD_CRC;
         }
-        return RFM95_OK;
+        else
+        {
+        	// clear the RxFlags interrupt
+			irq_rxFlags = (uint8_t)(~Irq_RxDone | Irq_ValidHeader);
+			rfm95_writeReg(rfm95, REG_IRQ_FLAGS, &irq_rxFlags);
+	        return RFM95_OK;
+        }
     }
     // fail to receive signal
     else
@@ -554,16 +563,17 @@ float RFM95_getPcktSNR(RFM95_t* rfm95)
 {
 	uint8_t readVal;
 	rfm95_readReg(rfm95, REG_PCKT_SNR_VAL, &readVal);
-	rfm95->Settings.LoRaPcktHandler.SNR = (float)readVal / 4;
+	rfm95->Settings.LoRaPcktHandler.SNR = (float)((int8_t)readVal * 0.25);
 	return rfm95->Settings.LoRaPcktHandler.SNR;
 }
 
 int16_t RFM95_getPcktRSSI(RFM95_t* rfm95)
 {
-	float pcktSNR = RFM95_getPcktSNR(rfm95);
+
 	uint8_t pcktRSSI;
 	if(rfm95_readReg(rfm95, REG_PCKT_RSSI_VAL, &pcktRSSI))
 				return RFM95_ERR_READ_REG;
+	float pcktSNR = RFM95_getPcktSNR(rfm95);;
 	// high frequency
 	if(rfm95->Settings.LoRa.frequency <= 1020000000 &&
 			rfm95->Settings.LoRa.frequency >= 862000000)
@@ -696,7 +706,7 @@ uint8_t RFM95_LoRa_Init(RFM95_t* rfm95)
 //    printf("RFM95_LoRa_setHeaderMode ..ok\r\n");
     // By default the packet is configured with a 12 symbol long sequence
     // If it exceeds over 19, SLGv1 won't be able to receive packet successfully.
-    ret = RFM95_LoRa_setPreamble(rfm95, 8);
+    ret = RFM95_LoRa_setPreamble(rfm95, 6);
     if(ret) return ret;
 //    printf("RFM95_LoRa_setPreamble ..ok\r\n");
     // set DIO0 Rx_Done IRQ: 0b00
