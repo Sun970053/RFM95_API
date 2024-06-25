@@ -220,6 +220,7 @@ uint8_t RFM95_LoRa_setBandwidth(RFM95_t* rfm95, lora_bw bw);
 uint8_t RFM95_LoRa_setCodingRate(RFM95_t* rfm95, lora_coding_rate cr);
 uint8_t RFM95_LoRa_setHeaderMode(RFM95_t* rfm95, bool val);
 uint8_t RFM95_LoRa_setPreamble(RFM95_t* rfm95, uint16_t preamblelen);
+uint8_t RFM95_LoRa_setLowDataRateOpt(RFM95_t* rfm95, bool val);
 uint8_t RFM95_checkVersion(RFM95_t* rfm95);
 uint8_t RFM95_LoRa_transmit(RFM95_t* rfm95, uint8_t* buffer, uint8_t bufferlen);
 

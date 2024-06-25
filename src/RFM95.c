@@ -362,6 +362,19 @@ uint8_t RFM95_LoRa_setPreamble(RFM95_t* rfm95, uint16_t preamblelen)
     return RFM95_OK;
 }
 
+uint8_t RFM95_LoRa_setLowDataRateOpt(RFM95_t* rfm95, bool val)
+{
+	uint8_t readVal, writeVal;
+	if(rfm95_readReg(rfm95, REG_MODEM_CONFIG_3, &readVal))
+		return RFM95_ERR_READ_REG;
+	// Low data rate optimize register location
+	writeVal = (uint8_t)((readVal & 0xF7) | (val << 3));
+	if(rfm95_writeReg(rfm95, REG_MODEM_CONFIG_3, &writeVal))
+		return RFM95_ERR_WRITE_REG;
+	rfm95->Settings.LoRa.lowDatarateOptimize = val;
+		return RFM95_OK;
+}
+
 uint8_t rfm95_lora_dio_mapping(RFM95_t* rfm95, uint8_t dioNB, uint8_t dioStatus)
 {
     uint8_t reg, dio_mapping_mask, dio_mapping_status;
@@ -658,7 +671,7 @@ uint8_t RFM95_LoRa_Init(RFM95_t* rfm95)
     if(ret) return ret;
 //    printf("RFM95_setLNAGain ..ok\r\n");
     // set spreading factor
-    ret = RFM95_LoRa_setSpreadingFactor(rfm95, 7);
+    ret = RFM95_LoRa_setSpreadingFactor(rfm95, 11);
     if(ret) return ret;
 //    printf("RFM95_LoRa_setSpreadingFactor ..ok\r\n");
     // set rx crc on
@@ -687,6 +700,9 @@ uint8_t RFM95_LoRa_Init(RFM95_t* rfm95)
     if(ret) return ret;
 //    printf("RFM95_LoRa_setPreamble ..ok\r\n");
     // set DIO0 Rx_Done IRQ: 0b00
+    ret = RFM95_LoRa_setLowDataRateOpt(rfm95, true);
+    if(ret) return ret;
+
     ret = rfm95_lora_dio_mapping(rfm95, 0, DIOx_MAPPING_00);
     if(ret) return ret;
 //    printf("rfm95_lora_dio_mapping ..ok\r\n");
