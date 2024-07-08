@@ -481,6 +481,7 @@ uint8_t RFM95_LoRa_prepareReceive(RFM95_t* rfm95, bool isRxContinous)
     if(isRxContinous)
     {
     	uint8_t irq = Irq_RxDone & Irq_PayloadCrcError & Irq_ValidHeader;
+    	uint8_t irq_rxFlags = (uint8_t)(~Irq_RxDone | ~Irq_PayloadCrcError | ~Irq_ValidHeader);
     	uint8_t fifoptr = 0;
         // set RegIrqFlagsMask: RxDoneMask, PayloadCrcErrorMask and ValidHeaderMask are activated.
         ret = rfm95_writeReg(rfm95, REG_IRQ_FLAGS_MASK, &irq);
@@ -496,6 +497,9 @@ uint8_t RFM95_LoRa_prepareReceive(RFM95_t* rfm95, bool isRxContinous)
         if(ret) return ret;
         ret = rfm95_writeReg(rfm95, REG_FIFO_RX_BASE_ADDR, &fifoptr);
         if(ret) return ret;
+        // clear the RxFlags interrupt
+		ret = rfm95_writeReg(rfm95, REG_IRQ_FLAGS, &irq_rxFlags);
+		if(ret) return ret;
 
         // set Rx Mode
 		ret = RFM95_LoRa_setOpMode(rfm95, RX_CONTINUOUS);
@@ -524,6 +528,7 @@ uint8_t RFM95_LoRa_receive(RFM95_t* rfm95, uint8_t* buffer, uint8_t bufferlen)
         rfm95_readReg(rfm95, REG_FIFO_RX_CURRENT_ADDR, &rxCurrentAddr);
         rfm95_writeReg(rfm95, REG_FIFO_ADDR_PTR, &rxCurrentAddr);
         minLen = (bufferlen >= rxNbBytes) ? rxNbBytes : bufferlen;
+        printf("rxNbByte: %d \r\n", rxNbBytes);
         
         ret = rfm95_fifo_readReg(rfm95, buffer, minLen);
         if(ret) return ret;
@@ -531,14 +536,14 @@ uint8_t RFM95_LoRa_receive(RFM95_t* rfm95, uint8_t* buffer, uint8_t bufferlen)
         if((readIrqFlag & (uint8_t)(~Irq_PayloadCrcError)) != 0x00)
         {
         	// clear the RxFlags interrupt
-        	irq_rxFlags = (uint8_t)(~Irq_RxDone | ~Irq_PayloadCrcError | Irq_ValidHeader);
+        	irq_rxFlags = (uint8_t)(~Irq_RxDone | ~Irq_PayloadCrcError | ~Irq_ValidHeader);
 			rfm95_writeReg(rfm95, REG_IRQ_FLAGS, &irq_rxFlags);
             return RFM95_ERR_RX_PAYLOAD_CRC;
         }
         else
         {
         	// clear the RxFlags interrupt
-			irq_rxFlags = (uint8_t)(~Irq_RxDone | Irq_ValidHeader);
+			irq_rxFlags = (uint8_t)(~Irq_RxDone | ~Irq_ValidHeader);
 			rfm95_writeReg(rfm95, REG_IRQ_FLAGS, &irq_rxFlags);
 	        return RFM95_OK;
         }
@@ -547,7 +552,9 @@ uint8_t RFM95_LoRa_receive(RFM95_t* rfm95, uint8_t* buffer, uint8_t bufferlen)
     else
     {
     	// clear the RxFlags interrupt
-		irq_rxFlags = (uint8_t)(~Irq_RxDone);
+		irq_rxFlags = (uint8_t)(~Irq_RxDone | ~Irq_ValidHeader);
+		rfm95_writeReg(rfm95, REG_IRQ_FLAGS, &irq_rxFlags);
+		// enter in sleep mode
         RFM95_LoRa_setOpMode(rfm95, SLEEP_MODE);
         return RFM95_ERR_RX_FAIL;
     }
@@ -708,7 +715,7 @@ uint8_t RFM95_LoRa_Init(RFM95_t* rfm95)
 //    printf("RFM95_LoRa_setHeaderMode ..ok\r\n");
     // By default the packet is configured with a 12 symbol long sequence
     // If it exceeds over 19, SLGv1 won't be able to receive packet successfully.
-    ret = RFM95_LoRa_setPreamble(rfm95, 6);
+    ret = RFM95_LoRa_setPreamble(rfm95, 8);
     if(ret) return ret;
 //    printf("RFM95_LoRa_setPreamble ..ok\r\n");
     // set DIO0 Rx_Done IRQ: 0b00
